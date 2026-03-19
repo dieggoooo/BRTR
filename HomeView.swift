@@ -144,8 +144,11 @@ struct HomeView: View {
                                 .padding(40)
                             } else {
                                 LazyVGrid(
-                                    columns: [GridItem(.flexible()), GridItem(.flexible())],
-                                    spacing: 16
+                                    columns: [
+                                        GridItem(.flexible(minimum: 0), spacing: 12),
+                                        GridItem(.flexible(minimum: 0), spacing: 12)
+                                    ],
+                                    spacing: 12
                                 ) {
                                     ForEach(servicesManager.services) { service in
                                         NavigationLink(destination: ServiceDetailView(service: service)) {
@@ -154,7 +157,7 @@ struct HomeView: View {
                                         .buttonStyle(PlainButtonStyle())
                                     }
                                 }
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, 16)
                             }
                         }
                     }
@@ -171,13 +174,14 @@ struct HomeView: View {
 }
 
 // MARK: - ServiceGridCard
+
 struct ServiceGridCard: View {
     let service: Service
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // Image area
+            // Image — fixed height
             ZStack(alignment: .topLeading) {
                 if let imageUrl = service.imageUrl, let url = URL(string: imageUrl) {
                     AsyncImage(url: url) { image in
@@ -185,72 +189,74 @@ struct ServiceGridCard: View {
                     } placeholder: {
                         categoryPlaceholder
                     }
-                    .frame(height: 140)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 120)
                     .clipped()
                 } else {
                     categoryPlaceholder
-                        .frame(height: 140)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
                 }
 
                 Text(service.serviceCategory.rawValue)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
                     .background(Color.brtrPurple)
-                    .cornerRadius(6)
+                    .cornerRadius(5)
                     .padding(8)
             }
 
-            // Info section
-            VStack(alignment: .leading, spacing: 8) {
+            // Info — fixed height
+            VStack(alignment: .leading, spacing: 5) {
                 Text(service.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(2)
-                    .frame(height: 40, alignment: .top)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(service.description)
-                    .font(.system(size: 12))
-                    .foregroundColor(.brtrTextSecondary)
-                    .lineLimit(2)
+                Spacer(minLength: 0)
 
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Circle()
                         .fill(Color.brtrPurpleDim)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 15, height: 15)
                         .overlay(
                             Text(String(service.owner.fullName.prefix(1)))
-                                .font(.system(size: 9))
+                                .font(.system(size: 7))
                                 .foregroundColor(.white)
                         )
                     Text(service.owner.username)
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                         .foregroundColor(.brtrTextMuted)
                         .lineLimit(1)
-
                     Spacer()
-
                     if service.owner.rating > 0 {
                         HStack(spacing: 2) {
                             Image(systemName: "star.fill")
-                                .font(.system(size: 10))
+                                .font(.system(size: 8))
                                 .foregroundColor(.yellow)
                             Text(String(format: "%.1f", service.owner.rating))
-                                .font(.system(size: 11))
+                                .font(.system(size: 9))
                                 .foregroundColor(.brtrTextMuted)
                         }
                     }
                 }
             }
-            .padding(12)
+            .padding(10)
+            .frame(maxWidth: .infinity)
+            .frame(height: 72)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 192)
         .background(Color.brtrCard)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.brtrBorder, lineWidth: 1)
         )
+        .clipped()
     }
 
     private var categoryPlaceholder: some View {
@@ -261,7 +267,7 @@ struct ServiceGridCard: View {
         )
         .overlay(
             Image(systemName: service.serviceCategory.icon)
-                .font(.system(size: 40))
+                .font(.system(size: 28))
                 .foregroundColor(.brtrPurpleLight.opacity(0.3))
         )
     }
@@ -316,7 +322,7 @@ struct ServiceCard: View {
                         .foregroundColor(.brtrTextSecondary)
                     Text("·")
                         .foregroundColor(.brtrTextMuted)
-                    Text(service.estimatedValue)
+                    Text(service.displayEstimatedValue)
                         .font(BRTRFont.caption())
                         .foregroundColor(.brtrPurpleLight)
                 }

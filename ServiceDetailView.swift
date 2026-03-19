@@ -54,7 +54,7 @@ struct ServiceDetailView: View {
                                     .foregroundColor(.brtrTextSecondary)
                                 Text("·")
                                     .foregroundColor(.brtrTextMuted)
-                                Text(service.estimatedValue)
+                                Text(service.displayEstimatedValue)
                                     .font(BRTRFont.subheadline())
                                     .foregroundColor(.brtrPurpleLight)
                             }

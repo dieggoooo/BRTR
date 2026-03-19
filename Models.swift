@@ -35,6 +35,35 @@ struct Service: Codable, Identifiable {
     var createdAt: Date
     var user: UserProfile?
 
+    // Shared trade fields
+    var listingType: String?
+    var estimatedValue: String?
+    var seekingInReturn: String?
+    var tradeFlexibility: Int?
+    var exchangeOptions: [String]?
+    var zipCode: String?
+    var barterRangeMin: Int?
+    var barterRangeMax: Int?
+
+    // Product fields
+    var condition: String?
+    var brand: String?
+    var modelYear: String?
+    var weightLbs: String?
+    var dimensions: String?
+    var deliveryMethods: [String]?
+    var hasOriginalBox: Bool?
+    var hasReceipt: Bool?
+    var hasSerialNumber: Bool?
+
+    // Service fields
+    var scope: String?
+    var serviceMode: String?
+    var experienceLevel: String?
+    var availableDays: [String]?
+    var portfolioLink: String?
+    var materialsNote: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -45,6 +74,29 @@ struct Service: Codable, Identifiable {
         case isActive = "is_active"
         case createdAt = "created_at"
         case user = "users"
+        case listingType = "listing_type"
+        case estimatedValue = "estimated_value"
+        case seekingInReturn = "seeking_in_return"
+        case tradeFlexibility = "trade_flexibility"
+        case exchangeOptions = "exchange_options"
+        case zipCode = "zip_code"
+        case barterRangeMin = "barter_range_min"
+        case barterRangeMax = "barter_range_max"
+        case condition
+        case brand
+        case modelYear = "model_year"
+        case weightLbs = "weight_lbs"
+        case dimensions
+        case deliveryMethods = "delivery_methods"
+        case hasOriginalBox = "has_original_box"
+        case hasReceipt = "has_receipt"
+        case hasSerialNumber = "has_serial_number"
+        case scope
+        case serviceMode = "service_mode"
+        case experienceLevel = "experience_level"
+        case availableDays = "available_days"
+        case portfolioLink = "portfolio_link"
+        case materialsNote = "materials_note"
     }
 }
 
@@ -144,7 +196,7 @@ enum ServiceCategory: String, CaseIterable, Codable {
     case cooking = "Cooking"
     case tutoring = "Tutoring"
     case other = "Other"
-    
+
     var icon: String {
         switch self {
         case .all: return "square.grid.2x2"
@@ -167,7 +219,7 @@ extension Service {
     var serviceCategory: ServiceCategory {
         ServiceCategory(rawValue: self.category) ?? .other
     }
-    
+
     var owner: UserProfile {
         user ?? UserProfile(
             id: userId,
@@ -180,28 +232,32 @@ extension Service {
             createdAt: Date()
         )
     }
-    
-    var availability: String {
-        "Available Now"
+
+    var availability: String { "Available Now" }
+
+    var displayEstimatedValue: String {
+        if let val = estimatedValue, !val.isEmpty { return "$\(val)" }
+        return "Value not set"
     }
-    
-    var estimatedValue: String {
-        "$100-$500"
+
+    var isProduct: Bool {
+        listingType == "product"
+    }
+
+    var flexibilityLabel: String {
+        switch tradeFlexibility ?? 65 {
+        case 0..<20:  return "Firm on terms"
+        case 20..<40: return "Mostly firm"
+        case 40..<60: return "Open to offers"
+        case 60..<80: return "Very flexible"
+        default:       return "Any offer welcome"
+        }
     }
 }
 
 // MARK: - UserProfile Extensions for UI
 extension UserProfile {
-    var name: String {
-        fullName
-    }
-    
-    var isVerified: Bool {
-        rating >= 4.5
-    }
-    
-    var completedTrades: Int {
-        reviewCount
-    }
+    var name: String { fullName }
+    var isVerified: Bool { rating >= 4.5 }
+    var completedTrades: Int { reviewCount }
 }
-
