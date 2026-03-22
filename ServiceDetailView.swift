@@ -5,7 +5,6 @@ struct ServiceDetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var barterManager: BarterManager
-
     @State private var showProposeSheet = false
     @State private var showMessageSheet = false
     @State private var isOwnService = false
@@ -35,29 +34,111 @@ struct ServiceDetailView: View {
 
                     VStack(alignment: .leading, spacing: 24) {
 
-                        // Title block
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(service.serviceCategory.rawValue.uppercased())
-                                .font(BRTRFont.caption())
-                                .foregroundColor(.brtrPurpleLight)
-                                .tracking(1.5)
+                        // Title block with trade intent
+                        VStack(alignment: .leading, spacing: 10) {
+
+                            // Type + category row
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: service.isProduct ? "shippingbox.fill" : "wrench.and.screwdriver.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(service.isProduct ? "PRODUCT" : "SERVICE")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .tracking(0.5)
+                                }
+                                .foregroundColor(service.isProduct ? Color(hex: "#F5A623") : .brtrPurpleLight)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(service.isProduct ? Color(hex: "#F5A623").opacity(0.15) : Color.brtrPurple.opacity(0.2))
+                                .cornerRadius(6)
+
+                                HStack(spacing: 4) {
+                                    Image(systemName: service.serviceCategory.icon)
+                                        .font(.system(size: 10))
+                                    Text(service.serviceCategory.rawValue.uppercased())
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .tracking(0.5)
+                                }
+                                .foregroundColor(.brtrTextMuted)
+                            }
 
                             Text(service.title)
-                                .font(BRTRFont.largeTitle())
+                                .font(.system(size: 26, weight: .bold))
                                 .foregroundColor(.white)
 
-                            HStack(spacing: 8) {
-                                Image(systemName: "clock")
-                                    .foregroundColor(.brtrTextMuted)
-                                Text(service.availability)
-                                    .font(BRTRFont.subheadline())
-                                    .foregroundColor(.brtrTextSecondary)
-                                Text("·")
-                                    .foregroundColor(.brtrTextMuted)
-                                Text(service.displayEstimatedValue)
-                                    .font(BRTRFont.subheadline())
-                                    .foregroundColor(.brtrPurpleLight)
+                            // Trade intent card
+                            VStack(spacing: 0) {
+                                // Offering row
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(service.isProduct ? Color(hex: "#F5A623").opacity(0.15) : Color.brtrPurple.opacity(0.2))
+                                            .frame(width: 36, height: 36)
+                                        Image(systemName: service.isProduct ? "shippingbox.fill" : "wrench.and.screwdriver.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(service.isProduct ? Color(hex: "#F5A623") : .brtrPurpleLight)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("OFFERING")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(.brtrTextMuted)
+                                            .tracking(0.5)
+                                        Text(service.isProduct ? "A product" : "A service")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(.white)
+                                    }
+                                    Spacer()
+                                    if let val = service.estimatedValue, !val.isEmpty {
+                                        Text("~$\(val)")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(.brtrPurpleLight)
+                                            .padding(.horizontal, 8).padding(.vertical, 4)
+                                            .background(Color.brtrPurpleDim.opacity(0.5))
+                                            .cornerRadius(8)
+                                    }
+                                }
+                                .padding(14)
+
+                                Divider().background(Color.brtrBorder).padding(.horizontal, 14)
+
+                                // In exchange for row
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.brtrCard)
+                                            .frame(width: 36, height: 36)
+                                        Image(systemName: "arrow.left.arrow.right")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.brtrTextSecondary)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("IN EXCHANGE FOR")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(.brtrTextMuted)
+                                            .tracking(0.5)
+                                        if let seeking = service.seekingInReturn, !seeking.isEmpty {
+                                            Text(seeking)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundColor(.white)
+                                        } else {
+                                            Text("Open to offers")
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundColor(.brtrTextSecondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    Text(service.flexibilityLabel)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(.brtrTextSecondary)
+                                        .padding(.horizontal, 7).padding(.vertical, 3)
+                                        .background(Color.brtrCard)
+                                        .cornerRadius(6)
+                                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.brtrBorder, lineWidth: 1))
+                                }
+                                .padding(14)
                             }
+                            .background(Color.brtrCard)
+                            .cornerRadius(14)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brtrBorder, lineWidth: 1))
                         }
 
                         Divider().background(Color.brtrBorder)
@@ -94,21 +175,14 @@ struct ServiceDetailView: View {
                                     }
                                 }
                             }
-
                             Spacer()
-
-                            if !isOwnService {
-                                Text("View Profile")
-                                    .font(BRTRFont.caption())
-                                    .foregroundColor(.brtrPurpleLight)
-                            }
                         }
                         .padding(16)
                         .brtrCard()
 
                         // Description
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("About this service")
+                            Text("About this listing")
                                 .font(BRTRFont.title2())
                                 .foregroundColor(.white)
                             Text(service.description)
@@ -134,14 +208,25 @@ struct ServiceDetailView: View {
                 Spacer()
                 VStack(spacing: 12) {
                     if isOwnService {
-                        // Show edit option for own services
-                        Button("Edit Service") {}
+                        Button("Edit Listing") {}
                             .buttonStyle(BRTRSecondaryButton())
                     } else {
-                        Button("Propose a Trade") {
+                        Button {
                             showProposeSheet = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.left.arrow.right.circle.fill")
+                                    .font(.system(size: 16))
+                                Text("Offer a Trade")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.brtrPurple)
+                            .foregroundColor(.white)
+                            .cornerRadius(14)
                         }
-                        .buttonStyle(BRTRPrimaryButton())
+                        .buttonStyle(PlainButtonStyle())
 
                         Button("Send a Message") {
                             showMessageSheet = true
@@ -174,7 +259,6 @@ struct ServiceDetailView: View {
                 .environmentObject(barterManager)
         }
         .sheet(isPresented: $showMessageSheet) {
-            // Navigate to messaging — placeholder until MessagesView is wired
             Text("Messaging coming soon")
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -183,6 +267,7 @@ struct ServiceDetailView: View {
     }
 
     // MARK: - Subviews
+
     private var heroPlaceholder: some View {
         ZStack {
             Color.brtrPurpleDim
@@ -205,6 +290,7 @@ struct ServiceDetailView: View {
 }
 
 // MARK: - Stat Pill
+
 struct StatPill: View {
     let icon: String
     let value: String
@@ -232,13 +318,13 @@ struct StatPill: View {
 }
 
 // MARK: - Propose Trade Sheet
+
 struct ProposeTradeSheet: View {
     let service: Service
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var barterManager: BarterManager
     @EnvironmentObject var servicesManager: ServicesManager
-
     @State private var selectedServiceId: UUID?
     @State private var message = ""
     @State private var isSending = false
@@ -252,7 +338,6 @@ struct ProposeTradeSheet: View {
                 Color.brtrBackground.ignoresSafeArea()
 
                 if didSend {
-                    // Success state
                     VStack(spacing: 16) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 64))
@@ -280,7 +365,6 @@ struct ProposeTradeSheet: View {
                                     .foregroundColor(.brtrTextMuted)
                                     .textCase(.uppercase)
                                     .tracking(1)
-
                                 HStack(spacing: 12) {
                                     Image(systemName: service.serviceCategory.icon)
                                         .font(.system(size: 20))
@@ -288,7 +372,6 @@ struct ProposeTradeSheet: View {
                                         .frame(width: 44, height: 44)
                                         .background(Color.brtrPurpleDim)
                                         .cornerRadius(10)
-
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(service.title)
                                             .font(BRTRFont.headline())
@@ -309,9 +392,8 @@ struct ProposeTradeSheet: View {
                                     .foregroundColor(.brtrTextMuted)
                                     .textCase(.uppercase)
                                     .tracking(1)
-
                                 if myServices.isEmpty {
-                                    Text("You have no active services. Create one first.")
+                                    Text("You have no active listings. Create one first.")
                                         .font(BRTRFont.subheadline())
                                         .foregroundColor(.brtrTextSecondary)
                                         .padding(14)
@@ -328,7 +410,6 @@ struct ProposeTradeSheet: View {
                                                     .frame(width: 44, height: 44)
                                                     .background(Color.brtrPurpleDim)
                                                     .cornerRadius(10)
-
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     Text(myService.title)
                                                         .font(BRTRFont.headline())
@@ -337,9 +418,7 @@ struct ProposeTradeSheet: View {
                                                         .font(BRTRFont.caption())
                                                         .foregroundColor(.brtrTextSecondary)
                                                 }
-
                                                 Spacer()
-
                                                 if selectedServiceId == myService.id {
                                                     Image(systemName: "checkmark.circle.fill")
                                                         .foregroundColor(.brtrPurple)
@@ -364,7 +443,6 @@ struct ProposeTradeSheet: View {
                                     .foregroundColor(.brtrTextMuted)
                                     .textCase(.uppercase)
                                     .tracking(1)
-
                                 TextField("Introduce yourself or describe the trade...", text: $message, axis: .vertical)
                                     .foregroundColor(.white)
                                     .lineLimit(4...6)
