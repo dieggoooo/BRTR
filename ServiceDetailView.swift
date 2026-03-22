@@ -5,9 +5,14 @@ struct ServiceDetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var barterManager: BarterManager
+    @EnvironmentObject var servicesManager: ServicesManager
     @State private var showProposeSheet = false
     @State private var showMessageSheet = false
     @State private var isOwnService = false
+
+    private var isSaved: Bool {
+        servicesManager.savedListingIds.contains(service.id)
+    }
 
     var body: some View {
         ZStack {
@@ -67,7 +72,6 @@ struct ServiceDetailView: View {
 
                             // Trade intent card
                             VStack(spacing: 0) {
-                                // Offering row
                                 HStack(spacing: 12) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 8)
@@ -100,7 +104,6 @@ struct ServiceDetailView: View {
 
                                 Divider().background(Color.brtrBorder).padding(.horizontal, 14)
 
-                                // In exchange for row
                                 HStack(spacing: 12) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 8)
@@ -250,6 +253,21 @@ struct ServiceDetailView: View {
             .padding(.leading, 20)
             .padding(.top, 60)
         }
+        // Bookmark button — top right
+        .overlay(alignment: .topTrailing) {
+            Button {
+                Task { await servicesManager.toggleSave(service.id) }
+            } label: {
+                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(isSaved ? .brtrPurple : .white)
+                    .frame(width: 40, height: 40)
+                    .background(Color.brtrCard.opacity(0.9))
+                    .clipShape(Circle())
+            }
+            .padding(.trailing, 20)
+            .padding(.top, 60)
+        }
         .onAppear {
             isOwnService = authManager.currentUser?.id == service.userId
         }
@@ -257,6 +275,7 @@ struct ServiceDetailView: View {
             ProposeTradeSheet(service: service)
                 .environmentObject(authManager)
                 .environmentObject(barterManager)
+                .environmentObject(servicesManager)
         }
         .sheet(isPresented: $showMessageSheet) {
             Text("Messaging coming soon")
@@ -265,8 +284,6 @@ struct ServiceDetailView: View {
                 .background(Color.brtrBackground)
         }
     }
-
-    // MARK: - Subviews
 
     private var heroPlaceholder: some View {
         ZStack {
@@ -358,7 +375,6 @@ struct ProposeTradeSheet: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
 
-                            // They offer
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("They offer")
                                     .font(BRTRFont.caption())
@@ -385,7 +401,6 @@ struct ProposeTradeSheet: View {
                                 .brtrCard()
                             }
 
-                            // You offer
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("You offer")
                                     .font(BRTRFont.caption())
@@ -436,7 +451,6 @@ struct ProposeTradeSheet: View {
                                 }
                             }
 
-                            // Message
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("Add a message (optional)")
                                     .font(BRTRFont.caption())
