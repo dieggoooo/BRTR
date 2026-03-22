@@ -243,7 +243,10 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
-            .task { await servicesManager.fetchServices() }
+            .task {
+                await servicesManager.fetchServices()
+                await servicesManager.fetchSavedListings()
+            }
         }
     }
 }
@@ -275,6 +278,11 @@ struct SkeletonCard: View {
 // MARK: - ServiceGridCard
 struct ServiceGridCard: View {
     let service: Service
+    @EnvironmentObject var servicesManager: ServicesManager
+
+    private var isSaved: Bool {
+        servicesManager.savedListingIds.contains(service.id)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -299,7 +307,7 @@ struct ServiceGridCard: View {
                 .frame(height: 120)
                 .clipped()
 
-                // Gradient fade for readability
+                // Gradient fade
                 LinearGradient(
                     colors: [Color.clear, Color.black.opacity(0.55)],
                     startPoint: .top,
@@ -307,7 +315,7 @@ struct ServiceGridCard: View {
                 )
                 .frame(height: 48)
 
-                // Wants chip at bottom of image
+                // Wants chip
                 if let seeking = service.seekingInReturn, !seeking.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.left.arrow.right")
@@ -329,6 +337,21 @@ struct ServiceGridCard: View {
             .frame(maxWidth: .infinity)
             .frame(height: 120)
             .clipped()
+            // Bookmark button — top right of image
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    Task { await servicesManager.toggleSave(service.id) }
+                } label: {
+                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(isSaved ? .brtrPurple : .white)
+                        .padding(7)
+                        .background(Color.black.opacity(0.45))
+                        .clipShape(Circle())
+                }
+                .padding(8)
+                .buttonStyle(PlainButtonStyle())
+            }
 
             // Info section
             VStack(alignment: .leading, spacing: 0) {
@@ -511,6 +534,9 @@ struct ProfileView: View {
     @State private var myListings: [Service] = []
     @State private var isLoadingListings = false
     @State private var showDeleteConfirm = false
+    @State private var selectedProfileTab: ProfileTab = .listings
+
+    enum ProfileTab { case listings, saved }
 
     var user: UserProfile? { authManager.currentUser }
 
@@ -569,43 +595,21 @@ struct ProfileView: View {
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.brtrBorder, lineWidth: 1))
                         .padding(.horizontal, 20).padding(.bottom, 28)
 
-                        // My Listings
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack {
-                                Text("My Listings").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
-                                Spacer()
-                                if !myListings.isEmpty {
-                                    Text("\(myListings.count)").font(.system(size: 12, weight: .semibold)).foregroundColor(.brtrPurpleLight)
-                                        .padding(.horizontal, 10).padding(.vertical, 4)
-                                        .background(Color.brtrPurpleDim.opacity(0.4)).cornerRadius(20)
-                                }
-                            }
-                            .padding(.horizontal, 20)
+                        // Tab switcher: My Listings / Saved
+                        HStack(spacing: 0) {
+                            profileTabButton(label: "My Listings", icon: "square.grid.2x2.fill", tab: .listings)
+                            profileTabButton(label: "Saved", icon: "bookmark.fill", tab: .saved)
+                        }
+                        .background(Color.brtrCard)
+                        .cornerRadius(12)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brtrBorder, lineWidth: 1))
+                        .padding(.horizontal, 20).padding(.bottom, 20)
 
-                            if isLoadingListings {
-                                HStack { Spacer(); ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .brtrPurple)); Spacer() }.padding(20)
-                            } else if myListings.isEmpty {
-                                VStack(spacing: 14) {
-                                    ZStack {
-                                        Circle().fill(Color.brtrPurpleDim.opacity(0.3)).frame(width: 64, height: 64)
-                                        Image(systemName: "plus.square.dashed").font(.system(size: 28)).foregroundColor(.brtrPurpleLight.opacity(0.7))
-                                    }
-                                    Text("No listings yet").font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
-                                    Text("Tap + to post your first listing").font(.system(size: 13)).foregroundColor(.brtrTextSecondary)
-                                }
-                                .frame(maxWidth: .infinity).padding(.vertical, 36)
-                            } else {
-                                LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
-                                    ForEach(myListings) { service in
-                                        NavigationLink(destination: ServiceDetailView(service: service).environmentObject(authManager).environmentObject(BarterManager.shared)) {
-                                            ServiceGridCard(service: service)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .frame(height: 212)
-                                    }
-                                }
-                                .padding(.horizontal, 14)
-                            }
+                        // Tab content
+                        if selectedProfileTab == .listings {
+                            listingsGrid
+                        } else {
+                            savedGrid
                         }
 
                         // Account actions
@@ -651,7 +655,102 @@ struct ProfileView: View {
             isLoadingListings = true
             myListings = servicesManager.services.filter { $0.userId == userId }
             isLoadingListings = false
+            await servicesManager.fetchSavedListings()
         }
+    }
+
+    // MARK: - My Listings grid
+    private var listingsGrid: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("My Listings").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
+                Spacer()
+                if !myListings.isEmpty {
+                    Text("\(myListings.count)").font(.system(size: 12, weight: .semibold)).foregroundColor(.brtrPurpleLight)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Color.brtrPurpleDim.opacity(0.4)).cornerRadius(20)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            if isLoadingListings {
+                HStack { Spacer(); ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .brtrPurple)); Spacer() }.padding(20)
+            } else if myListings.isEmpty {
+                emptyState(icon: "plus.square.dashed", title: "No listings yet", subtitle: "Tap + to post your first listing")
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
+                    ForEach(myListings) { service in
+                        NavigationLink(destination: ServiceDetailView(service: service).environmentObject(authManager).environmentObject(BarterManager.shared)) {
+                            ServiceGridCard(service: service)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .frame(height: 212)
+                    }
+                }
+                .padding(.horizontal, 14)
+            }
+        }
+    }
+
+    // MARK: - Saved grid
+    private var savedGrid: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Saved Listings").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
+                Spacer()
+                if !servicesManager.savedListings.isEmpty {
+                    Text("\(servicesManager.savedListings.count)").font(.system(size: 12, weight: .semibold)).foregroundColor(.brtrPurpleLight)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Color.brtrPurpleDim.opacity(0.4)).cornerRadius(20)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            if servicesManager.savedListings.isEmpty {
+                emptyState(icon: "bookmark", title: "Nothing saved yet", subtitle: "Tap the bookmark on any listing to save it")
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
+                    ForEach(servicesManager.savedListings) { service in
+                        NavigationLink(destination: ServiceDetailView(service: service).environmentObject(authManager).environmentObject(BarterManager.shared)) {
+                            ServiceGridCard(service: service)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .frame(height: 212)
+                    }
+                }
+                .padding(.horizontal, 14)
+            }
+        }
+    }
+
+    private func profileTabButton(label: String, icon: String, tab: ProfileTab) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.25)) { selectedProfileTab = tab }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 12, weight: .semibold))
+                Text(label).font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundColor(selectedProfileTab == tab ? .white : .brtrTextMuted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(selectedProfileTab == tab ? Color.brtrPurple : Color.clear)
+            .cornerRadius(10)
+            .padding(3)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func emptyState(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Color.brtrPurpleDim.opacity(0.3)).frame(width: 64, height: 64)
+                Image(systemName: icon).font(.system(size: 28)).foregroundColor(.brtrPurpleLight.opacity(0.7))
+            }
+            Text(title).font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+            Text(subtitle).font(.system(size: 13)).foregroundColor(.brtrTextSecondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 36).padding(.horizontal, 20)
     }
 
     private func statCell(value: String, label: String, icon: String) -> some View {
