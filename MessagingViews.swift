@@ -3,6 +3,7 @@ import SwiftUI
 // ─────────────────────────────────────────────
 // MARK: - Messages Tab
 // ─────────────────────────────────────────────
+
 struct MessagesView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var dm = DirectMessagingManager.shared
@@ -11,6 +12,7 @@ struct MessagesView: View {
         NavigationStack {
             ZStack {
                 Color.brtrBackground.ignoresSafeArea()
+
                 VStack(spacing: 0) {
                     HStack {
                         Text("Messages")
@@ -38,7 +40,10 @@ struct MessagesView: View {
                         ScrollView {
                             VStack(spacing: 0) {
                                 ForEach(dm.conversations) { conv in
-                                    NavigationLink(destination: DirectChatView(conversation: conv)) {
+                                    NavigationLink(destination:
+                                        DirectChatView(conversation: conv, service: nil)
+                                            .environmentObject(authManager)
+                                    ) {
                                         ConversationRow(conversation: conv)
                                             .environmentObject(authManager)
                                     }
@@ -58,6 +63,7 @@ struct MessagesView: View {
 // ─────────────────────────────────────────────
 // MARK: - Conversation Row
 // ─────────────────────────────────────────────
+
 struct ConversationRow: View {
     let conversation: Conversation
     @EnvironmentObject var authManager: AuthManager
@@ -82,13 +88,22 @@ struct ConversationRow: View {
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
+                    // Show listing title if available
+                    if let serviceTitle = conversation.serviceTitle {
+                        Text(serviceTitle)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.brtrPurpleLight)
+                            .lineLimit(1)
+                    }
                     Text(otherUser?.fullName ?? "Unknown")
                         .font(BRTRFont.headline()).foregroundColor(.white)
                     Text(conversation.lastMessage ?? "No messages yet")
                         .font(.system(size: 13)).foregroundColor(.brtrTextMuted)
                         .lineLimit(1)
                 }
+
                 Spacer()
+
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12)).foregroundColor(.brtrTextMuted)
             }
@@ -102,16 +117,20 @@ struct ConversationRow: View {
 // ─────────────────────────────────────────────
 // MARK: - Direct Chat View
 // ─────────────────────────────────────────────
+
 struct DirectChatView: View {
     let conversation: Conversation
-    // Optional service passed in when opening from a listing
-    var service: Service? = nil
+    var service: Service?
 
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var dm = DirectMessagingManager.shared
     @State private var messageText = ""
     @State private var showListingDetail = false
+    @State private var loadedService: Service? = nil
     @Environment(\.dismiss) var dismiss
+
+    // Use passed-in service first, fall back to loaded one
+    var activeService: Service? { service ?? loadedService }
 
     var otherUser: UserProfile? {
         guard let myId = authManager.currentUser?.id else { return nil }
@@ -123,6 +142,7 @@ struct DirectChatView: View {
     var body: some View {
         ZStack {
             Color.brtrBackground.ignoresSafeArea()
+
             VStack(spacing: 0) {
 
                 // ── Header ──────────────────────────────────
@@ -132,6 +152,7 @@ struct DirectChatView: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.white)
                     }
+
                     Circle()
                         .fill(Color.brtrPurple)
                         .frame(width: 34, height: 34)
@@ -140,6 +161,7 @@ struct DirectChatView: View {
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.white)
                         )
+
                     VStack(alignment: .leading, spacing: 1) {
                         Text(otherUser?.fullName ?? "Chat")
                             .font(BRTRFont.headline()).foregroundColor(.white)
@@ -148,54 +170,25 @@ struct DirectChatView: View {
                                 .font(.system(size: 11)).foregroundColor(.brtrTextMuted)
                         }
                     }
+
                     Spacer()
                 }
                 .padding(.horizontal, 20).padding(.vertical, 14)
                 .background(Color.brtrCard)
 
                 // ── Listing Context Card ─────────────────────
-                if let svc = service {
+                if let svc = activeService {
                     listingContextCard(service: svc)
                 }
 
                 // ── Messages ─────────────────────────────────
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 8) {
+                        LazyVStack(spacing: 4) {
                             ForEach(dm.messages) { message in
                                 let isMe = message.senderId == authManager.currentUser?.id
-                                HStack(alignment: .bottom, spacing: 8) {
-                                    if isMe { Spacer(minLength: 60) }
-
-                                    if !isMe {
-                                        Circle()
-                                            .fill(Color.brtrPurpleDim)
-                                            .frame(width: 26, height: 26)
-                                            .overlay(
-                                                Text(String(otherUser?.fullName.prefix(1) ?? "?"))
-                                                    .font(.system(size: 10, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                            )
-                                    }
-
-                                    VStack(alignment: isMe ? .trailing : .leading, spacing: 3) {
-                                        Text(message.content)
-                                            .font(.system(size: 15))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 14).padding(.vertical, 10)
-                                            .background(isMe ? Color.brtrPurple : Color.brtrCard)
-                                            .cornerRadius(18)
-                                            .cornerRadius(isMe ? 4 : 18, corners: isMe ? .bottomRight : .bottomLeft)
-                                        Text(formatTime(message.createdAt))
-                                            .font(.system(size: 10))
-                                            .foregroundColor(.brtrTextMuted)
-                                            .padding(.horizontal, 4)
-                                    }
+                                messageBubble(message: message, isMe: isMe)
                                     .id(message.id)
-
-                                    if isMe { Spacer(minLength: 0).frame(width: 0) }
-                                }
-                                .padding(.horizontal, 16)
                             }
                         }
                         .padding(.vertical, 16)
@@ -247,10 +240,15 @@ struct DirectChatView: View {
             await dm.fetchMessages(for: conversation.id)
             await dm.subscribeToMessages(for: conversation.id)
             await dm.markAsRead(conversationId: conversation.id)
+
+            // If no service passed in, try to load it from conversation's serviceId
+            if service == nil, let serviceId = conversation.serviceId {
+                loadedService = await DirectMessagingManager.shared.fetchService(id: serviceId)
+            }
         }
         .onDisappear { Task { await dm.unsubscribe() } }
         .sheet(isPresented: $showListingDetail) {
-            if let svc = service {
+            if let svc = activeService {
                 ServiceDetailView(service: svc)
                     .environmentObject(authManager)
                     .environmentObject(BarterManager.shared)
@@ -258,12 +256,52 @@ struct DirectChatView: View {
         }
     }
 
+    // ── Message Bubble ───────────────────────────────────────
+
+    @ViewBuilder
+    private func messageBubble(message: DirectMessage, isMe: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if isMe {
+                Spacer(minLength: 60)
+            } else {
+                Circle()
+                    .fill(Color.brtrPurpleDim)
+                    .frame(width: 26, height: 26)
+                    .overlay(
+                        Text(String(otherUser?.fullName.prefix(1) ?? "?"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white)
+                    )
+            }
+
+            VStack(alignment: isMe ? .trailing : .leading, spacing: 3) {
+                Text(message.content)
+                    .font(.system(size: 15))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(isMe ? Color.brtrPurple : Color.brtrCard)
+                    .clipShape(ChatBubbleShape(isMe: isMe))
+
+                Text(formatTime(message.createdAt))
+                    .font(.system(size: 10))
+                    .foregroundColor(.brtrTextMuted)
+                    .padding(.horizontal, 4)
+            }
+
+            if !isMe {
+                Spacer(minLength: 60)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 2)
+    }
+
     // ── Listing Context Card ─────────────────────────────────
+
     @ViewBuilder
     private func listingContextCard(service: Service) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                // Thumbnail
                 ZStack {
                     if let imageUrl = service.imageUrl, let url = URL(string: imageUrl) {
                         AsyncImage(url: url) { image in
@@ -289,7 +327,6 @@ struct DirectChatView: View {
                 .cornerRadius(10)
                 .clipped()
 
-                // Info
                 VStack(alignment: .leading, spacing: 3) {
                     Text(service.isProduct ? "Product listing" : "Service listing")
                         .font(.system(size: 11))
@@ -309,7 +346,6 @@ struct DirectChatView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
 
-            // CTA buttons
             HStack(spacing: 10) {
                 Button {
                     showListingDetail = true
@@ -325,7 +361,6 @@ struct DirectChatView: View {
                 .buttonStyle(PlainButtonStyle())
 
                 Button {
-                    // Pre-fill "Is this still available?"
                     messageText = "Is this still available?"
                 } label: {
                     Text("Still available?")
@@ -342,12 +377,7 @@ struct DirectChatView: View {
             .padding(.horizontal, 16).padding(.bottom, 12)
         }
         .background(Color.brtrSurface)
-        .overlay(
-            Rectangle()
-                .fill(Color.brtrBorder)
-                .frame(height: 1),
-            alignment: .bottom
-        )
+        .overlay(Rectangle().fill(Color.brtrBorder).frame(height: 1), alignment: .bottom)
     }
 
     private func formatTime(_ date: Date) -> String {
@@ -358,8 +388,53 @@ struct DirectChatView: View {
 }
 
 // ─────────────────────────────────────────────
+// MARK: - Chat Bubble Shape
+// ─────────────────────────────────────────────
+
+struct ChatBubbleShape: Shape {
+    let isMe: Bool
+    let radius: CGFloat = 18
+    let tail: CGFloat = 4
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let tl = CGPoint(x: rect.minX, y: rect.minY)
+        let tr = CGPoint(x: rect.maxX, y: rect.minY)
+        let br = CGPoint(x: rect.maxX, y: rect.maxY)
+        let bl = CGPoint(x: rect.minX, y: rect.maxY)
+
+        if isMe {
+            // Sent: all corners rounded, bottom-right is small nub
+            path.move(to: CGPoint(x: tl.x + radius, y: tl.y))
+            path.addLine(to: CGPoint(x: tr.x - radius, y: tr.y))
+            path.addQuadCurve(to: CGPoint(x: tr.x, y: tr.y + radius), control: tr)
+            path.addLine(to: CGPoint(x: br.x, y: br.y - radius - tail))
+            path.addQuadCurve(to: CGPoint(x: br.x - tail, y: br.y), control: br)
+            path.addLine(to: CGPoint(x: bl.x + radius, y: bl.y))
+            path.addQuadCurve(to: CGPoint(x: bl.x, y: bl.y - radius), control: bl)
+            path.addLine(to: CGPoint(x: tl.x, y: tl.y + radius))
+            path.addQuadCurve(to: CGPoint(x: tl.x + radius, y: tl.y), control: tl)
+        } else {
+            // Received: all corners rounded, bottom-left is small nub
+            path.move(to: CGPoint(x: tl.x + radius, y: tl.y))
+            path.addLine(to: CGPoint(x: tr.x - radius, y: tr.y))
+            path.addQuadCurve(to: CGPoint(x: tr.x, y: tr.y + radius), control: tr)
+            path.addLine(to: CGPoint(x: br.x, y: br.y - radius))
+            path.addQuadCurve(to: CGPoint(x: br.x - radius, y: br.y), control: br)
+            path.addLine(to: CGPoint(x: bl.x + tail, y: bl.y))
+            path.addQuadCurve(to: CGPoint(x: bl.x, y: bl.y - radius - tail), control: bl)
+            path.addLine(to: CGPoint(x: tl.x, y: tl.y + radius))
+            path.addQuadCurve(to: CGPoint(x: tl.x + radius, y: tl.y), control: tl)
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+// ─────────────────────────────────────────────
 // MARK: - Corner Radius Helper
 // ─────────────────────────────────────────────
+
 extension View {
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
@@ -369,6 +444,7 @@ extension View {
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
+
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(
             roundedRect: rect,
@@ -382,6 +458,7 @@ struct RoundedCorner: Shape {
 // ─────────────────────────────────────────────
 // MARK: - Start Chat Sheet (opens from ServiceDetailView)
 // ─────────────────────────────────────────────
+
 struct StartChatSheetView: View {
     let service: Service
     @EnvironmentObject var authManager: AuthManager
@@ -392,6 +469,7 @@ struct StartChatSheetView: View {
     var body: some View {
         ZStack {
             Color.brtrBackground.ignoresSafeArea()
+
             if isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -419,6 +497,7 @@ struct StartChatSheetView: View {
                         participantOne: authManager.currentUser!.id,
                         participantTwo: service.userId,
                         serviceId: service.id,
+                        serviceTitle: service.title,
                         lastMessage: nil,
                         lastMessageAt: Date(),
                         createdAt: Date(),
