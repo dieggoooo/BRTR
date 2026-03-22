@@ -164,15 +164,19 @@ struct SearchView: View {
                         }
                     } else if !servicesManager.services.isEmpty {
                         ScrollView {
-                            LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
+                            LazyVGrid(
+                                columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)],
+                                spacing: 12
+                            ) {
                                 ForEach(servicesManager.services) { service in
                                     NavigationLink(destination: ServiceDetailView(service: service)) {
-                                        ServiceGridCard(service: service).frame(height: 212)
+                                        ServiceGridCard(service: service)
                                     }
                                     .buttonStyle(PlainButtonStyle())
+                                    .frame(height: 212)
                                 }
                             }
-                            .padding(.horizontal, 14).padding(.top, 8)
+                            .padding(.horizontal, 16)
                         }
                     } else if hasSearched {
                         VStack(spacing: 16) {

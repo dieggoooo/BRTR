@@ -117,8 +117,17 @@ struct HomeView: View {
 
                         // Grid
                         if servicesManager.isLoading {
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                                ForEach(0..<6, id: \.self) { _ in SkeletonCard() }
+                            LazyVGrid(
+                                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                                spacing: 12
+                            ) {
+                                ForEach(servicesManager.services) { service in
+                                    NavigationLink(destination: ServiceDetailView(service: service)) {
+                                        ServiceGridCard(service: service)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .frame(height: 212)
+                                }
                             }
                             .padding(.horizontal, 14)
                         } else if servicesManager.services.isEmpty {
@@ -184,71 +193,127 @@ struct SkeletonCard: View {
 }
 
 // MARK: - ServiceGridCard
-
 struct ServiceGridCard: View {
     let service: Service
 
+    private let cardHeight: CGFloat = 200
+    private let imageHeight: CGFloat = 120
+    private let infoHeight: CGFloat = 80
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Image - 130pt fixed
+        VStack(alignment: .leading, spacing: 0) {
+
+            // ── Image section ──────────────────────────────────
             ZStack(alignment: .bottomLeading) {
                 Group {
                     if let imageUrl = service.imageUrl, let url = URL(string: imageUrl) {
                         AsyncImage(url: url) { phase in
-                            if case .success(let img) = phase { img.resizable().scaledToFill() }
-                            else { placeholderBg }
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                categoryPlaceholder
+                            }
                         }
                     } else {
-                        placeholderBg
+                        categoryPlaceholder
                     }
                 }
-                .frame(maxWidth: .infinity).frame(height: 130).clipped()
-                .overlay(LinearGradient(colors: [.clear, Color.black.opacity(0.45)], startPoint: .center, endPoint: .bottom))
+                .frame(width: .infinity, height: imageHeight) // won't compile – fix below
+                .clipped()
 
-                if let val = service.estimatedValue, !val.isEmpty {
-                    Text("$\(val)").font(.system(size: 11, weight: .bold)).foregroundColor(.white)
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(Color.brtrPurple.opacity(0.92)).cornerRadius(7)
+                // Price badge (bottom-left)
+                if let value = service.estimatedValue, !value.isEmpty {
+                    Text("$\(value)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.brtrPurple)
+                        .cornerRadius(8)
                         .padding(8)
                 }
             }
-            .frame(height: 130)
+            .frame(maxWidth: .infinity)
+            .frame(height: imageHeight)
+            .clipped()
 
-            // Info - 82pt fixed
-            VStack(alignment: .leading, spacing: 0) {
-                Label(service.serviceCategory.rawValue.uppercased(), systemImage: service.serviceCategory.icon)
-                    .font(.system(size: 8, weight: .bold)).tracking(0.4)
-                    .foregroundColor(.brtrPurpleLight).lineLimit(1)
-                    .padding(.bottom, 4)
+            // ── Category label ─────────────────────────────────
+            HStack(spacing: 4) {
+                Image(systemName: service.serviceCategory.icon)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.brtrPurpleLight)
+                Text(service.serviceCategory.rawValue.uppercased())
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.brtrPurpleLight)
+                    .tracking(0.5)
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
 
-                Text(service.title).font(.system(size: 13, weight: .semibold)).foregroundColor(.white)
-                    .lineLimit(2).frame(maxWidth: .infinity, maxHeight: 36, alignment: .topLeading)
+            // ── Title ──────────────────────────────────────────
+            Text(service.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.top, 2)
 
-                Spacer(minLength: 0)
+            Spacer(minLength: 0)
 
-                HStack(spacing: 4) {
-                    Circle().fill(Color.brtrPurpleDim).frame(width: 15, height: 15)
-                        .overlay(Text(String(service.owner.fullName.prefix(1))).font(.system(size: 7, weight: .bold)).foregroundColor(.white))
-                    Text(service.owner.username).font(.system(size: 10)).foregroundColor(.brtrTextMuted).lineLimit(1)
-                    Spacer()
-                    if service.owner.rating > 0 {
-                        Image(systemName: "star.fill").font(.system(size: 8)).foregroundColor(Color(hex: "#F5C518"))
-                        Text(String(format: "%.1f", service.owner.rating)).font(.system(size: 9)).foregroundColor(.brtrTextMuted)
+            // ── Username row ───────────────────────────────────
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.brtrPurpleDim)
+                    .frame(width: 15, height: 15)
+                    .overlay(
+                        Text(String(service.owner.fullName.prefix(1)))
+                            .font(.system(size: 7))
+                            .foregroundColor(.white)
+                    )
+                Text(service.owner.username)
+                    .font(.system(size: 10))
+                    .foregroundColor(.brtrTextMuted)
+                    .lineLimit(1)
+                Spacer()
+                if service.owner.rating > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.yellow)
+                        Text(String(format: "%.1f", service.owner.rating))
+                            .font(.system(size: 9))
+                            .foregroundColor(.brtrTextMuted)
                     }
                 }
             }
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .frame(height: 82).clipped()
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
         }
-        .frame(height: 212)
-        .background(Color.brtrCard).cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brtrBorder, lineWidth: 1))
+        // ── Fixed total card size ──────────────────────────────
+        .frame(maxWidth: .infinity)
+        .frame(height: cardHeight)
+        .background(Color.brtrCard)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.brtrBorder, lineWidth: 1)
+        )
         .clipped()
     }
 
-    private var placeholderBg: some View {
-        LinearGradient(colors: [Color.brtrPurpleDim.opacity(0.8), Color.brtrCard], startPoint: .topLeading, endPoint: .bottomTrailing)
-            .overlay(Image(systemName: service.serviceCategory.icon).font(.system(size: 28)).foregroundColor(.brtrPurpleLight.opacity(0.3)))
+    private var categoryPlaceholder: some View {
+        LinearGradient(
+            colors: [Color.brtrPurpleDim, Color.brtrCard],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(
+            Image(systemName: service.serviceCategory.icon)
+                .font(.system(size: 28))
+                .foregroundColor(.brtrPurpleLight.opacity(0.3))
+        )
     }
 }
 
@@ -415,12 +480,16 @@ struct ProfileView: View {
                                 }
                                 .frame(maxWidth: .infinity).padding(.vertical, 36)
                             } else {
-                                LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
+                                LazyVGrid(
+                                    columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)],
+                                    spacing: 12
+                                ) {
                                     ForEach(myListings) { service in
                                         NavigationLink(destination: ServiceDetailView(service: service).environmentObject(authManager).environmentObject(BarterManager.shared)) {
-                                            ServiceGridCard(service: service).frame(height: 212)
+                                            ServiceGridCard(service: service)
                                         }
                                         .buttonStyle(PlainButtonStyle())
+                                        .frame(height: 212)
                                     }
                                 }
                                 .padding(.horizontal, 14)
