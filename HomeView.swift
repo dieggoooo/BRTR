@@ -1,11 +1,41 @@
 import SwiftUI
 
+// MARK: - Trade Type Filter
+enum TradeTypeFilter: String, CaseIterable {
+    case all = "all"
+    case serviceForProduct = "s_for_p"
+    case productForService = "p_for_s"
+    case serviceForService = "s_for_s"
+    case productForProduct = "p_for_p"
+
+    var label: String {
+        switch self {
+        case .all: return "All Types"
+        case .serviceForProduct: return "Service for Product"
+        case .productForService: return "Product for Service"
+        case .serviceForService: return "Service for Service"
+        case .productForProduct: return "Product for Product"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .serviceForProduct: return "wrench.and.screwdriver"
+        case .productForService: return "shippingbox"
+        case .serviceForService: return "arrow.left.arrow.right"
+        case .productForProduct: return "shippingbox.fill"
+        }
+    }
+}
+
 // MARK: - HomeView
 
 struct HomeView: View {
     @EnvironmentObject var servicesManager: ServicesManager
     @EnvironmentObject var authManager: AuthManager
     @State private var selectedCategory: ServiceCategory = .all
+    @State private var selectedTradeType: TradeTypeFilter = .all
     @State private var searchText = ""
 
     private var greeting: String {
@@ -14,6 +44,18 @@ struct HomeView: View {
         case 0..<12: return "Good morning,"
         case 12..<17: return "Good afternoon,"
         default: return "Good evening,"
+        }
+    }
+
+    private var filteredServices: [Service] {
+        servicesManager.services.filter { service in
+            switch selectedTradeType {
+            case .all: return true
+            case .serviceForProduct: return !service.isProduct
+            case .productForService: return service.isProduct
+            case .serviceForService: return !service.isProduct
+            case .productForProduct: return service.isProduct
+            }
         }
     }
 
@@ -99,7 +141,31 @@ struct HomeView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 10)
+
+                        // Trade type filter
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(TradeTypeFilter.allCases, id: \.self) { filter in
+                                    Button {
+                                        withAnimation(.spring(response: 0.3)) { selectedTradeType = filter }
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: filter.icon).font(.system(size: 10, weight: .semibold))
+                                            Text(filter.label).font(.system(size: 12, weight: .semibold))
+                                        }
+                                        .foregroundColor(selectedTradeType == filter ? .white : .brtrTextSecondary)
+                                        .padding(.horizontal, 12).padding(.vertical, 7)
+                                        .background(selectedTradeType == filter ? Color.brtrPurpleDim : Color.brtrCard)
+                                        .cornerRadius(20)
+                                        .overlay(Capsule().stroke(selectedTradeType == filter ? Color.brtrPurple : Color.brtrBorder, lineWidth: 1))
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                        .padding(.bottom, 20)
 
                         // Section header
                         HStack {
@@ -107,7 +173,7 @@ struct HomeView: View {
                                 .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                             Spacer()
                             if !servicesManager.services.isEmpty {
-                                Text("\(servicesManager.services.count) found")
+                                Text("\(filteredServices.count) found")
                                     .font(.system(size: 12, weight: .medium)).foregroundColor(.brtrTextMuted)
                                     .padding(.horizontal, 10).padding(.vertical, 4)
                                     .background(Color.brtrCard).cornerRadius(20)
@@ -115,22 +181,36 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 20).padding(.bottom, 14)
 
+                        // Barter explainer banner
+                        if !servicesManager.services.isEmpty && !servicesManager.isLoading {
+                            HStack(spacing: 12) {
+                                Image(systemName: "arrow.left.arrow.right.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.brtrPurple)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Trade skills and goods")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    Text("Offer your service or product in exchange for theirs")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.brtrTextSecondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(Color.brtrPurple.opacity(0.12))
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brtrPurple.opacity(0.25), lineWidth: 1))
+                            .padding(.horizontal, 14).padding(.bottom, 14)
+                        }
+
                         // Grid
                         if servicesManager.isLoading {
-                            LazyVGrid(
-                                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
-                                spacing: 12
-                            ) {
-                                ForEach(servicesManager.services) { service in
-                                    NavigationLink(destination: ServiceDetailView(service: service)) {
-                                        ServiceGridCard(service: service)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .frame(height: 212)
-                                }
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                                ForEach(0..<6, id: \.self) { _ in SkeletonCard() }
                             }
                             .padding(.horizontal, 14)
-                        } else if servicesManager.services.isEmpty {
+                        } else if filteredServices.isEmpty {
                             VStack(spacing: 20) {
                                 ZStack {
                                     Circle().fill(Color.brtrPurpleDim.opacity(0.3)).frame(width: 90, height: 90)
@@ -147,12 +227,12 @@ struct HomeView: View {
                             .frame(maxWidth: .infinity).padding(.vertical, 60).padding(.horizontal, 40)
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
-                                ForEach(servicesManager.services) { service in
+                                ForEach(filteredServices) { service in
                                     NavigationLink(destination: ServiceDetailView(service: service)) {
                                         ServiceGridCard(service: service)
-                                            .frame(height: 212)
                                     }
                                     .buttonStyle(PlainButtonStyle())
+                                    .frame(height: 212)
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -175,7 +255,7 @@ struct SkeletonCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            RoundedRectangle(cornerRadius: 0).fill(Color.brtrCard).frame(height: 130)
+            RoundedRectangle(cornerRadius: 0).fill(Color.brtrCard).frame(height: 120)
             VStack(alignment: .leading, spacing: 8) {
                 RoundedRectangle(cornerRadius: 4).fill(Color.brtrBorder).frame(height: 12).frame(maxWidth: .infinity)
                 RoundedRectangle(cornerRadius: 4).fill(Color.brtrBorder).frame(height: 10).frame(width: 80)
@@ -196,15 +276,11 @@ struct SkeletonCard: View {
 struct ServiceGridCard: View {
     let service: Service
 
-    private let cardHeight: CGFloat = 200
-    private let imageHeight: CGFloat = 120
-    private let infoHeight: CGFloat = 80
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // ── Image section ──────────────────────────────────
-            ZStack(alignment: .bottomLeading) {
+            // Image section
+            ZStack(alignment: .bottom) {
                 Group {
                     if let imageUrl = service.imageUrl, let url = URL(string: imageUrl) {
                         AsyncImage(url: url) { phase in
@@ -219,85 +295,124 @@ struct ServiceGridCard: View {
                         categoryPlaceholder
                     }
                 }
-                .frame(width: .infinity, height: imageHeight) // won't compile – fix below
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
                 .clipped()
 
-                // Price badge (bottom-left)
-                if let value = service.estimatedValue, !value.isEmpty {
-                    Text("$\(value)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.brtrPurple)
-                        .cornerRadius(8)
-                        .padding(8)
+                // Gradient fade for readability
+                LinearGradient(
+                    colors: [Color.clear, Color.black.opacity(0.55)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 48)
+
+                // Wants chip at bottom of image
+                if let seeking = service.seekingInReturn, !seeking.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.system(size: 8, weight: .bold))
+                        Text("Wants: \(seeking)")
+                            .font(.system(size: 9, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.5))
+                    .cornerRadius(6)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: imageHeight)
+            .frame(height: 120)
             .clipped()
 
-            // ── Category label ─────────────────────────────────
-            HStack(spacing: 4) {
-                Image(systemName: service.serviceCategory.icon)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.brtrPurpleLight)
-                Text(service.serviceCategory.rawValue.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.brtrPurpleLight)
-                    .tracking(0.5)
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
+            // Info section
+            VStack(alignment: .leading, spacing: 0) {
 
-            // ── Title ──────────────────────────────────────────
-            Text(service.title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.top, 2)
-
-            Spacer(minLength: 0)
-
-            // ── Username row ───────────────────────────────────
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.brtrPurpleDim)
-                    .frame(width: 15, height: 15)
-                    .overlay(
-                        Text(String(service.owner.fullName.prefix(1)))
-                            .font(.system(size: 7))
-                            .foregroundColor(.white)
+                // Type pill + category row
+                HStack(spacing: 5) {
+                    HStack(spacing: 3) {
+                        Image(systemName: service.isProduct ? "shippingbox.fill" : "wrench.and.screwdriver.fill")
+                            .font(.system(size: 7, weight: .bold))
+                        Text(service.isProduct ? "PRODUCT" : "SERVICE")
+                            .font(.system(size: 8, weight: .bold))
+                            .tracking(0.4)
+                    }
+                    .foregroundColor(service.isProduct ? Color(hex: "#F5A623") : .brtrPurpleLight)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        service.isProduct
+                            ? Color(hex: "#F5A623").opacity(0.15)
+                            : Color.brtrPurple.opacity(0.2)
                     )
-                Text(service.owner.username)
-                    .font(.system(size: 10))
+                    .cornerRadius(5)
+
+                    HStack(spacing: 3) {
+                        Image(systemName: service.serviceCategory.icon)
+                            .font(.system(size: 8, weight: .semibold))
+                        Text(service.serviceCategory.rawValue.uppercased())
+                            .font(.system(size: 8, weight: .semibold))
+                            .tracking(0.3)
+                    }
                     .foregroundColor(.brtrTextMuted)
-                    .lineLimit(1)
-                Spacer()
-                if service.owner.rating > 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(.yellow)
-                        Text(String(format: "%.1f", service.owner.rating))
-                            .font(.system(size: 9))
-                            .foregroundColor(.brtrTextMuted)
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+                // Title
+                Text(service.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+
+                Spacer(minLength: 0)
+
+                // Owner row
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.brtrPurpleDim)
+                        .frame(width: 15, height: 15)
+                        .overlay(
+                            Text(String(service.owner.fullName.prefix(1)))
+                                .font(.system(size: 7))
+                                .foregroundColor(.white)
+                        )
+                    Text(service.owner.username)
+                        .font(.system(size: 10))
+                        .foregroundColor(.brtrTextMuted)
+                        .lineLimit(1)
+                    Spacer()
+                    if service.owner.rating > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 8))
+                                .foregroundColor(.yellow)
+                            Text(String(format: "%.1f", service.owner.rating))
+                                .font(.system(size: 9))
+                                .foregroundColor(.brtrTextMuted)
+                        }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity)
+            .frame(height: 92)
         }
-        // ── Fixed total card size ──────────────────────────────
         .frame(maxWidth: .infinity)
-        .frame(height: cardHeight)
+        .frame(height: 212)
         .background(Color.brtrCard)
-        .cornerRadius(12)
+        .cornerRadius(14)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.brtrBorder, lineWidth: 1)
         )
         .clipped()
@@ -480,10 +595,7 @@ struct ProfileView: View {
                                 }
                                 .frame(maxWidth: .infinity).padding(.vertical, 36)
                             } else {
-                                LazyVGrid(
-                                    columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)],
-                                    spacing: 12
-                                ) {
+                                LazyVGrid(columns: [GridItem(.flexible(minimum: 0), spacing: 12), GridItem(.flexible(minimum: 0), spacing: 12)], spacing: 12) {
                                     ForEach(myListings) { service in
                                         NavigationLink(destination: ServiceDetailView(service: service).environmentObject(authManager).environmentObject(BarterManager.shared)) {
                                             ServiceGridCard(service: service)
