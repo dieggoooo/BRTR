@@ -24,8 +24,7 @@ struct UserProfile: Codable, Identifiable {
 }
 
 // MARK: - Service
-struct Service: Codable, Identifiable, Hashable {
-    let id: UUID
+struct Service: Codable, Identifiable {    let id: UUID
     var userId: UUID
     var title: String
     var description: String
